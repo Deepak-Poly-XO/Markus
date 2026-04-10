@@ -3,3 +3,4 @@ weather.py
 __pycache__/
 *.mp3
 venv/
+wakeword_samples
