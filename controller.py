@@ -5,25 +5,47 @@ import winreg
 import psutil
 import webbrowser
 import pyautogui
+import threading
 from datetime import datetime
 
-# ── DYNAMIC APP FINDER ─────────────────────────────────────
-def find_app(app_name):
-    app_lower = app_name.lower()
+# ── APP CACHE ──────────────────────────────────────────────
+app_cache = {}
 
-    # 1. Search Start Menu shortcuts (most reliable)
-    start_menu_paths = [
+def build_app_cache():
+    """Runs once on startup in background thread"""
+    print("🔄 Building app cache...")
+    
+    search_locations = [
         os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
         r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
     ]
 
-    for base in start_menu_paths:
+    for base in search_locations:
         for root, dirs, files in os.walk(base):
             for file in files:
-                if app_lower in file.lower() and file.endswith((".lnk", ".exe")):
-                    return os.path.join(root, file)
+                if file.endswith((".lnk", ".exe")):
+                    name = file.lower().replace(".lnk","").replace(".exe","").strip()
+                    app_cache[name] = os.path.join(root, file)
 
-    # 2. Search Windows Registry (installed apps)
+    print(f"✅ App cache ready — {len(app_cache)} apps indexed")
+
+# Build cache in background so MARKUS starts instantly
+threading.Thread(target=build_app_cache, daemon=True).start()
+
+# ── DYNAMIC APP FINDER ─────────────────────────────────────
+def find_app(app_name):
+    app_lower = app_name.lower().strip()
+
+    # 1. Exact match in cache
+    if app_lower in app_cache:
+        return app_cache[app_lower]
+
+    # 2. Partial match in cache
+    for cached_name, path in app_cache.items():
+        if app_lower in cached_name:
+            return path
+
+    # 3. Registry fallback
     registry_paths = [
         r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths",
         r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths",
@@ -34,28 +56,14 @@ def find_app(app_name):
             for i in range(winreg.QueryInfoKey(key)[0]):
                 sub_name = winreg.EnumKey(key, i)
                 if app_lower in sub_name.lower():
-                    sub_key  = winreg.OpenKey(key, sub_name)
-                    path, _  = winreg.QueryValueEx(sub_key, "")
+                    sub_key = winreg.OpenKey(key, sub_name)
+                    path, _ = winreg.QueryValueEx(sub_key, "")
                     if os.path.exists(path):
                         return path
         except:
             continue
 
-    # 3. Search common install locations
-    search_dirs = [
-        r"C:\Program Files",
-        r"C:\Program Files (x86)",
-        os.path.expandvars(r"%LOCALAPPDATA%"),
-        os.path.expandvars(r"%APPDATA%"),
-    ]
-    for directory in search_dirs:
-        pattern = os.path.join(directory, "**", f"*{app_name}*.exe")
-        results = glob.glob(pattern, recursive=True)
-        if results:
-            # Return shortest path (most likely the main exe)
-            return min(results, key=len)
-
-    # 4. Try Windows shell directly as last resort
+    # 4. Last resort — shell
     return app_name
 
 def open_app(app_name):
@@ -65,10 +73,8 @@ def open_app(app_name):
         os.startfile(path)
         return f"Opening {app_name} right away sir."
     except Exception as e:
-        # Last resort — try shell command
         try:
-            subprocess.Popen(["cmd", "/c", "start", app_name],
-                           shell=True)
+            subprocess.Popen(["cmd", "/c", "start", app_name], shell=True)
             return f"Opening {app_name} sir."
         except:
             return f"Could not find {app_name} on your system sir."
@@ -113,10 +119,10 @@ def set_volume(action):
         from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
         from comtypes import CLSCTX_ALL
 
-        devices  = AudioUtilities.GetSpeakers()
+        devices   = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume   = interface.QueryInterface(IAudioEndpointVolume)
-        current  = volume.GetMasterVolumeLevelScalar()
+        volume    = interface.QueryInterface(IAudioEndpointVolume)
+        current   = volume.GetMasterVolumeLevelScalar()
 
         if action == "up":
             new = min(current + 0.1, 1.0)
