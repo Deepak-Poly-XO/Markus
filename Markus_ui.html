@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARKUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #010a12;
+    --bg2:       #020d18;
+    --bg3:       #041525;
+    --accent:    #00c8ff;
+    --accent2:   #0066aa;
+    --accent3:   #003355;
+    --glow:      rgba(0,200,255,0.15);
+    --glow2:     rgba(0,200,255,0.05);
+    --text:      #cce8ff;
+    --text2:     #4a8aaa;
+    --text3:     #1a4466;
+    --orange:    #ff8800;
+    --green:     #00ff88;
+    --red:       #ff3344;
+    --white:     #e8f4ff;
+    --font-main: 'Rajdhani', sans-serif;
+    --font-mono: 'Share Tech Mono', monospace;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SCANLINE ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #app {
+      position: fixed;
+      inset: 0;
+      width: 100vw; height: 100vh;
+      display: grid;
+      grid-template-rows: 36px 1fr 48px 60px;
+      grid-template-columns: 320px 1fr 320px;
+      grid-template-areas:
+        "topbar  topbar  topbar"
+        "left    center  right"
+        "statbar statbar statbar"
+        "wave    wave    wave";
+      z-index: 2;
+      overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--accent3);
+    background: rgba(1,10,18,0.9);
+  }
+
+  .topbar-left { display: flex; align-items: center; gap: 20px; }
+  .topbar-logo {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 4px;
+  }
+  .topbar-sep { width: 1px; height: 16px; background: var(--accent3); }
+  .topbar-item {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text2);
+    letter-spacing: 2px;
+  }
+  .topbar-item span { color: var(--accent); }
+
+  #clock {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+  }
+
+  /* ── LEFT PANEL ── */
+  #left {
+    grid-area: left;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 8px 12px 12px;
+    overflow: hidden;  /* ← contains children */
+    min-height: 0;     /* ← critical for grid children */
+  }
+  /* ── RIGHT PANEL ── */
+  #right {
+    grid-area: right;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 12px 12px 8px;
+  }
+
+  /* ── PANEL ── */
+  .panel {
+    background: rgba(2,13,24,0.85);
+    border: 1px solid var(--accent3);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+  }
+
+  .panel-header {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--accent3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    background: rgba(0,100,170,0.08);
+  }
+
+  .panel-header .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  .panel-body {
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text2);
+    line-height: 1.7;
+    height: calc(100% - 30px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .panel-body::-webkit-scrollbar { display: none; }
+
+  /* ── CONVERSATION LOG ── */
+  #conv-panel {
+    flex: 1;
+    min-height: 0;    /* ← allows it to shrink */
+    overflow: hidden; /* ← panel stays fixed size */
+  }
+
+  .msg { margin-bottom: 10px; }
+  .msg-sender {
+    font-size: 9px;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+  }
+  .msg-sender.markus { color: var(--accent); }
+  .msg-sender.you    { color: var(--green); }
+  .msg-sender.system { color: var(--text3); }
+  .msg-text {
+    font-size: 11px;
+    color: var(--white);
+    line-height: 1.5;
+    font-family: var(--font-main);
+    font-weight: 400;
+  }
+  .msg-text.system-text { color: var(--text3); font-size: 9px; }
+
+  /* ── SYSTEM LOG ── */
+  .log-line {
+    font-size: 9px;
+    color: var(--text2);
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(0,100,170,0.1);
+    display: flex;
+    gap: 8px;
+  }
+  .log-line .log-time { color: var(--text3); min-width: 45px; }
+  .log-line .log-msg  { color: var(--text); }
+  .log-line.ok   .log-msg { color: var(--green); }
+  .log-line.warn .log-msg { color: var(--orange); }
+  .log-line.err  .log-msg { color: var(--red); }
+
+  /* ── NOTIFICATIONS ── */
+  .notif {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0,100,170,0.1);
+    font-size: 10px;
+  }
+  .notif-icon { font-size: 10px; margin-top: 1px; }
+  .notif-text { color: var(--text); }
+  .notif-sub  { color: var(--text2); font-size: 9px; }
+
+  /* ── STATS PANEL ── */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0,100,170,0.08);
+  }
+  .stat-label { font-size: 9px; color: var(--text2); letter-spacing: 1px; }
+  .stat-value { font-size: 10px; color: var(--accent); font-weight: bold; }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--accent3);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* ── CENTER ── */
+  #center {
+    grid-area: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* Crosshair lines */
+  #center::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent3), var(--accent2), var(--accent3), transparent);
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  #center::after {
+    content: '';
+    position: absolute;
+    left: 50%; top: 0; bottom: 0;
+    width: 1px;
+    background: linear-gradient(180deg, transparent, var(--accent3), var(--accent2), var(--accent3), transparent);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  /* ── ORB CANVAS ── */
+  #orb-canvas {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* ── MARKUS TITLE ── */
+  #markus-title {
+    text-align: center;
+    margin-top: 16px;
+    z-index: 3;
+    position: relative;
+  }
+
+  #markus-title h1 {
+    font-family: var(--font-main);
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: 12px;
+    color: var(--white);
+    text-shadow: 0 0 30px rgba(0,200,255,0.5);
+    line-height: 1;
+  }
+
+  #markus-title .subtitle {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 6px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  #status-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 4px;
+    margin-top: 8px;
+    transition: color 0.3s;
+  }
+
+  /* ── STATUS BAR ── */
+  #statbar {
+    grid-area: statbar;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    border-top: 1px solid var(--accent3);
+    border-bottom: 1px solid var(--accent3);
+    background: rgba(1,10,18,0.9);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+  }
+
+  .stat-item { display: flex; align-items: center; gap: 8px; }
+  .stat-item .s-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 2s ease-in-out infinite;
+  }
+  .stat-item .s-label { color: var(--text2); }
+  .stat-item .s-value { color: var(--accent); font-weight: bold; }
+  .stat-sep { color: var(--accent3); }
+
+  /* ── WAVEFORM ── */
+  #waveform-section {
+    grid-area: wave;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 40px;
+    background: rgba(1,10,18,0.9);
+    border-top: 1px solid var(--accent3);
+  }
+
+  #wave-canvas { width: 100%; height: 44px; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+  /* Scrollbar */
+  * { scrollbar-width: thin; scrollbar-color: var(--accent3) transparent; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">MARKUS SYS</div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-item">BUILD <span>v2.0</span></div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-item">NODE <span>DEEPU-PC</span></div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-item">LOCATION <span>CALGARY</span></div>
+    </div>
+    <div id="clock">--:--:--</div>
+  </div>
+
+  <!-- LEFT PANEL -->
+  <div id="left">
+
+    <!-- Conversation Log -->
+    <div class="panel" id="conv-panel">
+      <div class="panel-header">
+        <div class="dot"></div>
+        CONVERSATION LOG
+      </div>
+      <div class="panel-body" id="conv-log">
+        <div class="msg">
+          <div class="msg-sender system">── SYSTEM</div>
+          <div class="msg-text system-text">MARKUS initialized. All systems nominal.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Stats -->
+    <div class="panel" style="flex-shrink:0">
+      <div class="panel-header">
+        <div class="dot"></div>
+        SYSTEM STATS
+      </div>
+      <div class="panel-body">
+        <div class="stat-row">
+          <span class="stat-label">CPU</span>
+          <span class="stat-value" id="stat-cpu">--%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="bar-cpu" style="width:0%"></div></div>
+        <div class="stat-row" style="margin-top:6px">
+          <span class="stat-label">RAM</span>
+          <span class="stat-value" id="stat-ram">--%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="bar-ram" style="width:0%"></div></div>
+        <div class="stat-row" style="margin-top:6px">
+          <span class="stat-label">BATTERY</span>
+          <span class="stat-value" id="stat-bat">--%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="bar-bat" style="width:0%"></div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER ORB -->
+  <div id="center">
+    <canvas id="orb-canvas" width="340" height="340"></canvas>
+    <div id="markus-title">
+      <h1>MARKUS</h1>
+      <div class="subtitle">AI STATUS : <span id="ai-status-sub" style="color:var(--accent)">ACTIVE</span></div>
+      <div id="status-text" style="color:var(--accent)">● STANDBY</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right">
+
+    <!-- System Log -->
+    <div class="panel" style="flex:1">
+      <div class="panel-header">
+        <div class="dot"></div>
+        SYSTEM LOG
+      </div>
+      <div class="panel-body" id="sys-log">
+        <div class="log-line ok">
+          <span class="log-time">00:00</span>
+          <span class="log-msg">Core systems online</span>
+        </div>
+        <div class="log-line ok">
+          <span class="log-time">00:00</span>
+          <span class="log-msg">App cache ready</span>
+        </div>
+        <div class="log-line ok">
+          <span class="log-time">00:00</span>
+          <span class="log-msg">Wake word active</span>
+        </div>
+        <div class="log-line ok">
+          <span class="log-time">00:00</span>
+          <span class="log-msg">Memory loaded</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="panel" style="flex-shrink:0">
+      <div class="panel-header">
+        <div class="dot" style="background:var(--orange)"></div>
+        NOTIFICATIONS
+      </div>
+      <div class="panel-body" id="notif-panel">
+        <div class="notif">
+          <div class="notif-icon" style="color:var(--green)">✓</div>
+          <div>
+            <div class="notif-text">MARKUS Online</div>
+            <div class="notif-sub">All modules loaded</div>
+          </div>
+        </div>
+        <div class="notif">
+          <div class="notif-icon" style="color:var(--accent)">◈</div>
+          <div>
+            <div class="notif-text">Wake Word Active</div>
+            <div class="notif-sub">Say "MARKUS" to activate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="statbar">
+    <div class="stat-item">
+      <div class="s-dot"></div>
+      <span class="s-label">ANALYTICS</span>
+      <span class="s-value">ONLINE</span>
+    </div>
+    <div class="stat-sep">|</div>
+    <div class="stat-item">
+      <div class="s-dot" style="animation-delay:0.5s"></div>
+      <span class="s-label">MEMORY</span>
+      <span class="s-value" id="mem-pct">0%</span>
+    </div>
+    <div class="stat-sep">|</div>
+    <div class="stat-item">
+      <div class="s-dot" style="animation-delay:1s"></div>
+      <span class="s-label">UPLINK</span>
+      <span class="s-value">CONNECTED</span>
+    </div>
+    <div class="stat-sep">|</div>
+    <div class="stat-item">
+      <span class="s-label">ESC</span>
+      <span class="s-value">SHUTDOWN</span>
+    </div>
+  </div>
+
+  <!-- WAVEFORM -->
+  <div id="waveform-section">
+    <canvas id="wave-canvas"></canvas>
+  </div>
+
+</div>
+
+<script>
+
+
+// F11 toggles fullscreen
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'F11') {
+        e.preventDefault();
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            document.documentElement.requestFullscreen();
+        }
+    }
+});
+// ── CLOCK ──────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const h   = String(now.getHours()).padStart(2,'0');
+  const m   = String(now.getMinutes()).padStart(2,'0');
+  const s   = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── ORB CANVAS ─────────────────────────────────────────
+const orbCanvas = document.getElementById('orb-canvas');
+const ctx       = orbCanvas.getContext('2d');
+const CX = 170, CY = 170;
+let angle     = 0;
+let pulse     = 0;
+let pulseDir  = 1;
+let orbColor  = '#00c8ff';
+let orbStatus = 'STANDBY';
+
+function drawOrb() {
+  ctx.clearRect(0, 0, 340, 340);
+
+  // Outer glow rings
+  for (let i = 3; i >= 1; i--) {
+    ctx.beginPath();
+    ctx.arc(CX, CY, 140 + i*4, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(0,200,255,${0.03 * i})`;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+
+  // Main outer ring
+  ctx.beginPath();
+  ctx.arc(CX, CY, 140, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(0,100,170,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Tick marks
+  for (let i = 0; i < 36; i++) {
+    const a  = (i / 36) * Math.PI * 2;
+    const r1 = i % 3 === 0 ? 132 : 135;
+    const r2 = 140;
+    ctx.beginPath();
+    ctx.moveTo(CX + r1 * Math.cos(a), CY + r1 * Math.sin(a));
+    ctx.lineTo(CX + r2 * Math.cos(a), CY + r2 * Math.sin(a));
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(0,200,255,0.6)' : 'rgba(0,100,170,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Spinning arc 1
+  const a1 = angle * Math.PI / 180;
+  ctx.beginPath();
+  ctx.arc(CX, CY, 140, a1, a1 + 1.8);
+  ctx.strokeStyle = orbColor;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = orbColor;
+  ctx.shadowBlur  = 12;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Spinning arc 2 (opposite)
+  ctx.beginPath();
+  ctx.arc(CX, CY, 140, a1 + Math.PI, a1 + Math.PI + 1.0);
+  ctx.strokeStyle = 'rgba(0,100,170,0.5)';
+  ctx.lineWidth   = 1;
+  ctx.stroke();
+
+  // Middle ring
+  ctx.beginPath();
+  ctx.arc(CX, CY, 110, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(0,80,140,0.3)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 8]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Inner ring spinning opposite
+  const a2 = -angle * 0.7 * Math.PI / 180;
+  ctx.beginPath();
+  ctx.arc(CX, CY, 80, a2, a2 + 2.4);
+  ctx.strokeStyle = `rgba(0,200,255,0.4)`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(CX, CY, 80, a2 + Math.PI, a2 + Math.PI + 1.2);
+  ctx.strokeStyle = `rgba(0,100,170,0.3)`;
+  ctx.lineWidth   = 1;
+  ctx.stroke();
+
+  // Pulse ring
+  pulse += 0.04 * pulseDir;
+  if (pulse >= 1) pulseDir = -1;
+  if (pulse <= 0) pulseDir =  1;
+
+  const pr = 50 + pulse * 14;
+  ctx.beginPath();
+  ctx.arc(CX, CY, pr, 0, Math.PI*2);
+  ctx.strokeStyle = orbColor;
+  ctx.lineWidth   = 2;
+  ctx.globalAlpha = 0.6 + pulse * 0.4;
+  ctx.shadowColor = orbColor;
+  ctx.shadowBlur  = 20;
+  ctx.stroke();
+  ctx.shadowBlur  = 0;
+  ctx.globalAlpha = 1;
+
+  // Core glow
+  const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, 45);
+  grad.addColorStop(0, `rgba(180,240,255,${0.5 + pulse*0.3})`);
+  grad.addColorStop(0.3, `rgba(0,200,255,${0.3 + pulse*0.2})`);
+  grad.addColorStop(0.7, `rgba(0,100,180,0.15)`);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(CX, CY, 45, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(CX, CY, 5, 0, Math.PI*2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = orbColor;
+  ctx.shadowBlur  = 16;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Diamond markers on outer ring
+  for (let i = 0; i < 4; i++) {
+    const da = (i / 4) * Math.PI * 2 + angle * Math.PI / 180 * 0.3;
+    const dx = CX + 140 * Math.cos(da);
+    const dy = CY + 140 * Math.sin(da);
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.rotate(da + Math.PI/4);
+    ctx.fillStyle = orbColor;
+    ctx.fillRect(-4, -4, 8, 8);
+    ctx.restore();
+  }
+
+  angle = (angle + 1.2) % 360;
+  requestAnimationFrame(drawOrb);
+}
+drawOrb();
+
+// ── WAVEFORM ───────────────────────────────────────────
+const waveCanvas = document.getElementById('wave-canvas');
+const wCtx       = waveCanvas.getContext('2d');
+let waveActive   = false;
+let waveData     = [];
+
+function resizeWave() {
+  waveCanvas.width  = waveCanvas.offsetWidth;
+  waveCanvas.height = waveCanvas.offsetHeight;
+}
+resizeWave();
+window.addEventListener('resize', resizeWave);
+
+function drawWave() {
+  const W = waveCanvas.width;
+  const H = waveCanvas.height;
+  wCtx.clearRect(0, 0, W, H);
+
+  const bars  = 80;
+  const barW  = W / bars - 1;
+  const baseH = 3;
+
+  for (let i = 0; i < bars; i++) {
+    let h;
+    if (waveActive) {
+      h = baseH + Math.abs(Math.sin(Date.now()/200 + i*0.4)) * (H/2 - 4)
+                * (0.4 + 0.6 * Math.random());
+    } else {
+      h = baseH + Math.abs(Math.sin(Date.now()/2000 + i*0.3)) * 4;
+    }
+
+    const x     = i * (barW + 1);
+    const alpha = waveActive ? 0.9 : 0.3;
+
+    wCtx.fillStyle = waveActive
+      ? `rgba(0,200,255,${alpha})`
+      : `rgba(0,100,170,${alpha})`;
+
+    wCtx.fillRect(x, H/2 - h/2, barW, h);
+  }
+
+  requestAnimationFrame(drawWave);
+}
+drawWave();
+
+// ── PUBLIC API called from Python ──────────────────────
+function setStatus(status, color) {
+  orbColor = color || '#00c8ff';
+  orbStatus = status;
+  const el = document.getElementById('status-text');
+  if (el) {
+    el.textContent = '● ' + status;
+    el.style.color = orbColor;
+  }
+  const sub = document.getElementById('ai-status-sub');
+  if (sub) sub.style.color = orbColor;
+
+  waveActive = (status === 'LISTENING' || status === 'SPEAKING');
+  addSysLog(status, status === 'ERROR' ? 'err' : 'ok');
+}
+
+function addMessage(sender, text) {
+  const log  = document.getElementById('conv-log');
+  const div  = document.createElement('div');
+  div.className = 'msg fade-in';
+
+  const sClass = sender === 'MARKUS' ? 'markus'
+               : sender === 'YOU'    ? 'you'
+               : 'system';
+  const tClass = sender === 'SYSTEM' ? 'system-text' : '';
+
+  div.innerHTML = `
+    <div class="msg-sender ${sClass}">${sender === 'SYSTEM' ? '── SYSTEM' : sender}</div>
+    <div class="msg-text ${tClass}">${text}</div>
+  `;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addSysLog(msg, type) {
+  const log  = document.getElementById('sys-log');
+  const div  = document.createElement('div');
+  div.className = `log-line ${type || ''} fade-in`;
+  const now  = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  div.innerHTML = `<span class="log-time">${time}</span><span class="log-msg">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addNotification(title, sub, type) {
+  const panel = document.getElementById('notif-panel');
+  const colors = { ok: 'var(--green)', warn: 'var(--orange)', info: 'var(--accent)' };
+  const icons  = { ok: '✓', warn: '⚠', info: '◈' };
+  const c = type || 'info';
+  const div = document.createElement('div');
+  div.className = 'notif fade-in';
+  div.innerHTML = `
+    <div class="notif-icon" style="color:${colors[c]}">${icons[c]}</div>
+    <div>
+      <div class="notif-text">${title}</div>
+      <div class="notif-sub">${sub || ''}</div>
+    </div>
+  `;
+  panel.insertBefore(div, panel.firstChild);
+}
+
+function updateStats(cpu, ram, battery) {
+  if (cpu !== undefined) {
+    document.getElementById('stat-cpu').textContent = cpu + '%';
+    document.getElementById('bar-cpu').style.width  = cpu + '%';
+  }
+  if (ram !== undefined) {
+    document.getElementById('stat-ram').textContent = ram + '%';
+    document.getElementById('bar-ram').style.width  = ram + '%';
+  }
+  if (battery !== undefined) {
+    document.getElementById('stat-bat').textContent = battery + '%';
+    document.getElementById('bar-bat').style.width  = battery + '%';
+  }
+}
+
+function updateMemory(pct) {
+  document.getElementById('mem-pct').textContent = pct + '%';
+}
+</script>
+</body>
+</html>

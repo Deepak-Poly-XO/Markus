@@ -7,6 +7,8 @@ import webbrowser
 import pyautogui
 import threading
 from datetime import datetime
+import pyperclip
+import time
 
 # ── APP CACHE ──────────────────────────────────────────────
 app_cache = {}
@@ -65,6 +67,45 @@ def find_app(app_name):
 
     # 4. Last resort — shell
     return app_name
+
+def open_and_write(app_name, text):
+    try:
+        import pygetwindow as gw
+        import pyperclip
+
+        # Check if app already open
+        existing = [w for w in gw.getAllWindows() 
+                   if app_name.lower() in w.title.lower()]
+
+        if existing:
+            # Focus existing window instead of opening new one
+            print(f"📋 {app_name} already open — focusing existing window")
+            win = existing[0]
+            win.restore()
+            win.activate()
+            time.sleep(0.5)
+        else:
+            # Open fresh
+            print(f"📂 Opening {app_name}...")
+            open_app(app_name)
+            time.sleep(2.5)
+
+            windows = [w for w in gw.getAllWindows()
+                      if app_name.lower() in w.title.lower()]
+            if windows:
+                windows[0].activate()
+                time.sleep(0.5)
+
+        # Type at current cursor position
+        pyperclip.copy(text)
+        pyautogui.hotkey('ctrl', 'v')
+        print(f"✅ Written: {text[:30]}...")
+
+        return f"Written to {app_name} sir."
+
+    except Exception as e:
+        print(f"❌ Write error: {e}")
+        return f"Could not write to {app_name} sir."
 
 def open_app(app_name):
     try:
@@ -163,24 +204,42 @@ def get_system_stats():
 # ── SCREENSHOT ─────────────────────────────────────────────
 def take_screenshot():
     try:
-        path = os.path.join(
-            os.path.expanduser("~"), "Desktop",
-            f"markus_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        )
-        pyautogui.screenshot(path)
+        from PIL import ImageGrab
+
+        # Check OneDrive Desktop first, then standard
+        onedrive_desktop = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop")
+        standard_desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+        desktop = onedrive_desktop if os.path.exists(onedrive_desktop) else standard_desktop
+
+        filename = f"markus_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        path     = os.path.join(desktop, filename)
+
+        print(f"📸 Saving to: {path}")
+        img = ImageGrab.grab()
+        img.save(path)
+
+        print(f"✅ Saved successfully")
         return f"Screenshot saved to your desktop sir."
+
     except Exception as e:
-        return f"Screenshot failed: {e}"
+        print(f"❌ Screenshot error: {e}")
+        return f"Screenshot failed sir. Check terminal."
 
 # ── MASTER EXECUTE ─────────────────────────────────────────
 def execute_command(command: dict):
     action = command.get("action", "").lower()
     target = command.get("target", "")
 
-    if action == "open_app":       return open_app(target)
-    elif action == "close_app":    return close_app(target)
-    elif action == "open_website": return open_website(target)
-    elif action == "volume":       return set_volume(target)
-    elif action == "system_stats": return get_system_stats()
-    elif action == "screenshot":   return take_screenshot()
-    else:                          return None
+    if action == "open_app":        return open_app(target)
+    elif action == "close_app":     return close_app(target)
+    elif action == "open_website":  return open_website(target)
+    elif action == "volume":        return set_volume(target)
+    elif action == "system_stats":  return get_system_stats()
+    elif action == "screenshot":    return take_screenshot()
+    elif action == "open_and_write":
+        parts    = target.split("|", 1)
+        app_name = parts[0] if len(parts) > 0 else "notepad"
+        text     = parts[1] if len(parts) > 1 else ""
+        return open_and_write(app_name, text)
+    else:                           return None

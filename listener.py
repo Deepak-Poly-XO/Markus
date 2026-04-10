@@ -6,6 +6,7 @@ import webrtcvad
 import torch
 import warnings
 import collections
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -19,25 +20,33 @@ FRAME_SIZE     = int(SAMPLE_RATE * FRAME_MS / 1000)  # 480 samples
 SILENCE_LIMIT  = 1.5         # seconds of silence before stopping
 MIN_SPEECH     = 0.5         # minimum seconds of speech to process
 
-def listen():
+def listen(silence_limit=0.8, sample_rate=16000):
     print("🎙️  Listening...")
-    
-    audio_buffer   = []
-    speech_frames  = []
-    silent_chunks  = 0
-    speaking       = False
 
-    max_silent = int(SILENCE_LIMIT * 1000 / FRAME_MS)   # chunks of silence allowed
-    min_speech = int(MIN_SPEECH  * 1000 / FRAME_MS)     # minimum speech chunks
+    speech_frames = []
+    silent_chunks = 0
+    speaking      = False
 
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
-                         dtype='int16', blocksize=FRAME_SIZE) as stream:
+    max_silent = int(silence_limit * 1000 / FRAME_MS)
+    min_speech = int(MIN_SPEECH * 1000 / FRAME_MS)
+
+    with sd.InputStream(samplerate=sample_rate, channels=1,
+                        dtype='int16', blocksize=FRAME_SIZE) as stream:
         while True:
-            frame, _ = stream.read(FRAME_SIZE)
+            frame, _    = stream.read(FRAME_SIZE)
             frame_bytes = frame.tobytes()
 
-            is_speech = vad.is_speech(frame_bytes, SAMPLE_RATE)
-            audio_buffer.append(frame.copy())
+            # ← Check energy before VAD
+            energy = np.abs(frame.astype(np.float32)).mean()
+            if energy < 200:  # too quiet — ignore completely
+                if speaking:
+                    silent_chunks += 1
+                    if silent_chunks > max_silent:
+                        print("🔇  Speech ended.")
+                        break
+                continue
+
+            is_speech = vad.is_speech(frame_bytes, sample_rate)
 
             if is_speech:
                 speaking      = True
@@ -47,26 +56,31 @@ def listen():
                 if speaking:
                     silent_chunks += 1
                     speech_frames.append(frame.copy())
-
                     if silent_chunks > max_silent:
                         print("🔇  Speech ended.")
                         break
+                else:
+                    silent_chunks += 1
+                    if silent_chunks > max_silent:
+                        print("🔇  No speech detected.")
+                        return ""
 
-    # Need minimum speech to process
     if len(speech_frames) < min_speech:
-        print("📝  Too short, ignored.")
         return ""
 
     print("🔄  Processing...")
     audio_np = np.concatenate(speech_frames).flatten().astype(np.float32) / 32768.0
 
-    import tempfile, os
+    import tempfile
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         temp_path = f.name
-        wav.write(temp_path, SAMPLE_RATE, 
-                  (audio_np * 32767).astype(np.int16))
+        wav.write(temp_path, sample_rate, (audio_np * 32767).astype(np.int16))
 
-    result = model.transcribe(temp_path)
+    result = model.transcribe(
+        temp_path,
+        initial_prompt="MARKUS open Notepad Spotify Chrome VS Code close volume screenshot write",
+        language="en"
+    )
     os.remove(temp_path)
 
     text = result["text"].strip()

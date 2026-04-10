@@ -1,0 +1,26 @@
+{
+  "user": {
+    "name": "Deepu",
+    "location": "Calgary",
+    "preferences": {}
+  },
+  "conversations": [
+    {
+      "date": "2025-04-10",
+      "summary": "Discussed weather, opened Spotify"
+    },
+    {
+      "date": "2026-04-10 04:24",
+      "summary": "I've added more to the story. Would you like me to keep going, Sir?"
+    },
+    {
+      "date": "2026-04-10 04:25",
+      "summary": "I'll add the next part to the story now, Sir. Want me to keep going with more, or would you like to take it in a different direction?"
+    }
+  ],
+  "facts": {
+    "job": "Full stack developer",
+    "project": "DinoCode",
+    "assistant": "MARKUS"
+  }
+}
