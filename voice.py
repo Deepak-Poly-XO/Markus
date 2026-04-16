@@ -37,4 +37,6 @@ def speak(text):
     print(f"🤖 MARKUS: {text}")
     speaking_event.set()          # ← Block wake word detection
     asyncio.run(_speak_async(text))
+    import time
+    time.sleep(0.3)
     speaking_event.clear()        # ← Resume after speaking done

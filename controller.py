@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import subprocess
 import os
 import glob
@@ -243,3 +245,27 @@ def execute_command(command: dict):
         text     = parts[1] if len(parts) > 1 else ""
         return open_and_write(app_name, text)
     else:                           return None
+
+# AUTO GENERATED
+def markus_search_songs_youtube():
+    import webbrowser
+    import time
+    search_query = "popular songs 2024"
+    url = f"https://www.youtube.com/results?search_query={search_query.replace(' ', '+')}"
+    webbrowser.open(url)
+    time.sleep(2)
+    return "Searched for songs on YouTube sir."
+
+
+# AUTO GENERATED
+def markus_search_mr_bees_youtube():
+    import webbrowser
+    import urllib.parse
+    search_query = "Mr. Bees"
+    encoded_query = urllib.parse.quote(search_query)
+    url = f"https://www.youtube.com/results?search_query={encoded_query}"
+    webbrowser.open(url)
+    return "Searching for Mr. Bees on YouTube sir."
+
+
+

@@ -4,3 +4,4 @@ __pycache__/
 *.mp3
 venv/
 wakeword_samples
+spotify_control.py
